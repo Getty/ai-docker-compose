@@ -1,0 +1,157 @@
+services:
+
+  traefik:
+    container_name: "traefik"
+    hostname: "traefik.internal"
+    restart: "always"
+    image: "traefik:2.11"
+    volumes:
+      - "${AI_DATA:-.}/traefik/traefik.toml:/etc/traefik/traefik.toml"
+      - "${AI_DATA:-.}/traefik/acme.json:/etc/traefik/acme.json"
+      - "${AI_DATA:-.}/traefik/config:/etc/traefik/config"
+      - "${AI_DATA:-.}/tls:/etc/traefik/tls"
+      - "${AI_DATA:-.}/log/traefik:/var/log/traefik"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.services.traefik.loadbalancer.server.scheme=http"
+      - "traefik.http.routers.traefikweb.rule=Host(`traefik.${AI_DOMAIN?:Requires AI_DOMAIN}`)"
+      - "traefik.http.routers.traefikweb.entryPoints=http"
+      - "traefik.http.routers.traefikweb.middlewares=https_redirect@file"
+      - "traefik.http.routers.traefikweb.priority=10"
+      - "traefik.http.routers.traefikwebtls.rule=Host(`traefik.${AI_DOMAIN}`)"
+      - "traefik.http.routers.traefikwebtls.entryPoints=https"
+      - "traefik.http.routers.traefikwebtls.middlewares=auth@file"
+      - "traefik.http.routers.traefikwebtls.tls=true"
+      - "traefik.http.routers.traefikwebtls.tls.certresolver=le"
+      - "traefik.http.routers.traefikwebtls.tls.domains[0].main=traefik.${AI_DOMAIN}"
+      - "traefik.http.routers.traefikwebtls.priority=10"
+    environment:
+      - "CLOUDFLARE_API_KEY=${CLOUDFLARE_API_KEY}"
+      - "CLOUDFLARE_EMAIL=${CLOUDFLARE_EMAIL}"
+    networks:
+      ainet:
+        ipv4_address: ${AI_NETWORK}.250
+
+  # searxng:
+  #   image: "searxng/searxng"
+  #   container_name: "searxng"
+  #   hostname: "searxng.internal"
+  #   restart: unless-stopped
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.services.searxng.loadbalancer.server.port=8080"
+  #     - "traefik.http.services.searxng.loadbalancer.server.scheme=http"
+  #     - "traefik.http.routers.searxngweb.rule=Host(`searxng.${AI_DOMAIN}`)"
+  #     - "traefik.http.routers.searxngweb.entryPoints=http"
+  #     - "traefik.http.routers.searxngweb.middlewares=https_redirect@file"
+  #     - "traefik.http.routers.searxngweb.priority=10"
+  #     - "traefik.http.routers.searxngwebtls.rule=Host(`searxng.${AI_DOMAIN}`)"
+  #     - "traefik.http.routers.searxngwebtls.entryPoints=https"
+  #     - "traefik.http.routers.searxngwebtls.middlewares=auth@file"
+  #     - "traefik.http.routers.searxngwebtls.tls=true"
+  #     - "traefik.http.routers.searxngwebtls.priority=10"
+  #     - "traefik.http.routers.searxngwebtls.tls.certresolver=le"
+  #     - "traefik.http.routers.searxngwebtls.tls.domains[0].main=searxng.${AI_DOMAIN}"
+  #   environment:
+  #     INSTANCE_NAME: ${AI_DOMAIN}
+  #     BASE_URL: http://searxng:8080
+  #     SEARXNG_SECRET: "${SEARXNG_SECRET?:Requires SEARXNG_SECRET}"
+  #     SEARXNG_PUBLIC_INSTANCE: true
+  #     SEARXNG_SETTINGS_PATH: "/etc/ai-searxng"
+  #   volumes:
+  #     - "${AI_DATA:-.}/searxng:/etc/ai-searxng"
+  #   networks:
+  #     ainet:
+  #       ipv4_address: ${AI_NETWORK}.245
+
+  ollama:
+    image: "ollama/ollama:latest"
+    container_name: "ollama"
+    hostname: "ollama.internal"
+    restart: unless-stopped
+    volumes:
+      - "${AI_DATA:-.}/ollama:/root/.ollama"
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_BASE_URL: https://ollama.${AI_DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.ollama.loadbalancer.server.port=11434"
+      - "traefik.http.services.ollama.loadbalancer.server.scheme=http"
+      - "traefik.http.routers.ollamaweb.rule=Host(`ollama.${AI_DOMAIN}`)"
+      - "traefik.http.routers.ollamaweb.entryPoints=http"
+      - "traefik.http.routers.ollamaweb.middlewares=https_redirect@file"
+      - "traefik.http.routers.ollamaweb.priority=10"
+      - "traefik.http.routers.ollamawebtls.rule=Host(`ollama.${AI_DOMAIN}`)"
+      - "traefik.http.routers.ollamawebtls.entryPoints=https"
+      - "traefik.http.routers.ollamawebtls.middlewares=auth@file"
+      - "traefik.http.routers.ollamawebtls.tls=true"
+      - "traefik.http.routers.ollamawebtls.priority=10"
+      - "traefik.http.routers.ollamawebtls.tls.certresolver=le"
+      - "traefik.http.routers.ollamawebtls.tls.domains[0].main=ollama.${AI_DOMAIN}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['all']
+              capabilities: [gpu]
+    networks:
+      ainet:
+        ipv4_address: ${AI_NETWORK}.240
+
+  openwebui:
+    image: "ghcr.io/open-webui/open-webui:cuda"
+    container_name: "openwebui"
+    hostname: "openwebui.internal"
+    restart: unless-stopped
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      WEBUI_URL: "https://openwebui.${AI_DOMAIN}"
+      WEBUI_NAME: "${AI_DOMAIN}"
+      ENABLE_RAG_WEB_SEARCH: true
+      ENABLE_RAG_HYBRID_SEARCH: true
+      RAG_WEB_SEARCH_ENGINE: "searxng"
+      RAG_WEB_SEARCH_RESULT_COUNT: 10
+      RAG_WEB_SEARCH_CONCURRENT_REQUESTS: 5
+      RAG_TOP_K: 5
+      SEARXNG_QUERY_URL: "http://searxng:8080/search?format=json&q=<query>"
+    volumes:
+      - "${AI_DATA:-.}/openwebui:/app/backend/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.openwebui.loadbalancer.server.port=8080"
+      - "traefik.http.services.openwebui.loadbalancer.server.scheme=http"
+      - "traefik.http.routers.openwebuiweb.rule=Host(`openwebui.${AI_DOMAIN}`)"
+      - "traefik.http.routers.openwebuiweb.entryPoints=http"
+      - "traefik.http.routers.openwebuiweb.middlewares=https_redirect@file"
+      - "traefik.http.routers.openwebuiweb.priority=10"
+      - "traefik.http.routers.openwebuiwebtls.rule=Host(`openwebui.${AI_DOMAIN}`)"
+      - "traefik.http.routers.openwebuiwebtls.entryPoints=https"
+      - "traefik.http.routers.openwebuiwebtls.tls=true"
+      - "traefik.http.routers.openwebuiwebtls.priority=10"
+      - "traefik.http.routers.openwebuiwebtls.tls.certresolver=le"
+      - "traefik.http.routers.openwebuiwebtls.tls.domains[0].main=openwebui.${AI_DOMAIN}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['all']
+              capabilities: [gpu]
+    extra_hosts:
+      - "ollama:${AI_NETWORK}.240"
+      - "searxng:${AI_NETWORK}.245"
+    networks:
+      ainet:
+        ipv4_address: ${AI_NETWORK}.239
+
+networks:
+  ainet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: ${AI_NETWORK?:Requires AI_NETWORK}.0/24

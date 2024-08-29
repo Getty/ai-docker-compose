@@ -1,0 +1,77 @@
+################################################################
+# Global configuration
+################################################################
+[global]
+  checkNewVersion = true
+  sendAnonymousUsage = false
+
+################################################################
+# Entrypoints configuration
+################################################################
+
+[entryPoints]
+  [entryPoints.http]
+    address = ":80"
+  [entryPoints.https]
+    address = ":443"
+  [entryPoints.traefik]
+    address = ":8080"
+
+################################################################
+# Traefik logs configuration
+################################################################
+
+[log]
+  level = "INFO"
+
+################################################################
+# Access logs configuration
+################################################################
+
+[accessLog]
+  filePath = "/var/log/traefik/access.log"
+
+################################################################
+# API and dashboard configuration
+################################################################
+
+# Enable API and dashboard
+[api]
+  insecure = true
+  dashboard = true
+  debug = true
+
+################################################################
+# Ping configuration
+################################################################
+
+[ping]
+
+################################################################
+# Docker configuration backend
+################################################################
+
+[providers]
+  [providers.docker]
+    exposedByDefault = false
+    watch = true
+  [providers.file]
+    directory = "/etc/traefik/config"
+    watch = true
+
+[certificatesResolvers.le.acme]
+  email = "info@"
+  storage = "/etc/traefik/acme.json"
+  #caServer = "https://acme-v02.api.letsencrypt.org/directory"
+  caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  [certificatesResolvers.le.acme.httpChallenge]
+    entryPoint = "http"
+
+[certificatesResolvers.lecf.acme]
+  email = "info@"
+  storage = "/etc/traefik/acme.json"
+  #caServer = "https://acme-v02.api.letsencrypt.org/directory"
+  caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  [certificatesResolvers.lecf.acme.dnsChallenge]
+    provider = "cloudflare"
+

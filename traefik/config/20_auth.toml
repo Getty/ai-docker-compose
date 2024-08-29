@@ -1,0 +1,5 @@
+[http.middlewares]
+  [http.middlewares.auth.basicAuth]
+  users = [
+    "you:$apr1$UHLFqhXa$vjUV3vdCllfg.ye4403de0"
+  ]
